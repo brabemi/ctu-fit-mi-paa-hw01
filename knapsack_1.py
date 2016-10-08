@@ -69,9 +69,60 @@ def brute_force(instance, ins_id):
 	items = [False for i in range(instance['size'])]
 	bf_rec(instance=instance, depth=0, price=0, weight=0, items=items)
 	#~ if instance['bf_sol']['price'] != instance['opt_sol']['price'] or instance['bf_sol']['items'] != instance['opt_sol']['items']:
-	if instance['bf_sol']['price'] != instance['opt_sol']['price']:
-		print('{} failed \n\toptimal:    {}\n\tbrute force:{}'.format(ins_id, instance['opt_sol'], instance['bf_sol']))
+	#~ if instance['bf_sol']['price'] != instance['opt_sol']['price']:
+		#~ print('{} failed \n\toptimal:    {}\n\tbrute force:{}'.format(ins_id, instance['opt_sol'], instance['bf_sol']))
 
+def heur_ppw(instance, ins_id):
+	data = [(i, instance['prices'][i]/instance['weights'][i]) for i in range(instance['size'])]
+	data.sort(key=lambda item: item[1], reverse=True)
+	pprint(data)
+	items = [False for i in range(instance['size'])]
+	weight = 0
+	price = 0
+	for item in data:
+		if weight + instance['weights'][item[0]] < instance['capacity']:
+			weight += instance['weights'][item[0]]
+			price += instance['prices'][item[0]]
+			items[item[0]] = True
+	instance['hppw_sol'] = {
+		'price': price,
+		'weight': weight,
+		'items': items
+	}
+
+def heur_price(instance, ins_id):
+	data = [(i, instance['prices'][i]) for i in range(instance['size'])]
+	data.sort(key=lambda item: item[1], reverse=True)
+	items = [False for i in range(instance['size'])]
+	weight = 0
+	price = 0
+	for item in data:
+		if weight + instance['weights'][item[0]] < instance['capacity']:
+			weight += instance['weights'][item[0]]
+			price += item[1]
+			items[item[0]] = True
+	instance['hpri_sol'] = {
+		'price': price,
+		'weight': weight,
+		'items': items
+	}
+
+def heur_weight(instance, ins_id):
+	data = [(i, instance['weights'][i]) for i in range(instance['size'])]
+	data.sort(key = lambda item: item[1])
+	items = [False for i in range(instance['size'])]
+	weight = 0
+	price = 0
+	for item in data:
+		if weight + item[1] < instance['capacity']:
+			weight += item[1]
+			price += instance['prices'][item[0]]
+			items[item[0]] = True
+	instance['hwei_sol'] = {
+		'price': price,
+		'weight': weight,
+		'items': items
+	}
 
 @click.command()
 @click.option(
@@ -88,10 +139,13 @@ def main(instances_file, solutions_file):
 	instances = load_instances(instances_file, solutions_file)
 	index = 1
 	for key, instance in instances.items():
-		start = time.time()
+		#~ start = time.time()
 		brute_force(instance, key)
-		#~ print(instance)
-		print('{} of {}, time {:0.3f}s'.format(index, len(instances), time.time() - start))
+		heur_weight(instance, key)
+		heur_price(instance, key)
+		heur_ppw(instance, key)
+		pprint(instance)
+		#~ print('{} of {}, time {:0.3f}s'.format(index, len(instances), time.time() - start))
 		index += 1
 	#~ pprint(instances)
 	return 0
