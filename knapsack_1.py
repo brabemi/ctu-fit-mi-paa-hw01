@@ -31,7 +31,6 @@ def load_instances(instances_file, solutions_file):
 	sol.close()
 	return instances
 
-
 def bf_rec2(instance, depth, price, weight, items):
 	if depth < instance['size']:
 		items[depth] = True
@@ -47,6 +46,41 @@ def bf_rec2(instance, depth, price, weight, items):
 		price -= instance['prices'][depth]
 		weight -= instance['weights'][depth]
 		bf_rec(instance, depth+1, price, weight, items)
+
+def bfc_rec(instance, depth, price, weight, items, rest_items):
+	if weight > instance['capacity']:
+		return
+
+	if price > instance['bfc_sol']['price'] and weight <= instance['capacity']:
+		instance['bfc_sol']['price'] = price
+		instance['bfc_sol']['weight'] = weight
+		instance['bfc_sol']['items'] = items[:]
+
+	if depth < instance['size']:
+		if price+rest_items[depth] < instance['bfc_sol']['price']:
+			return
+		items[depth] = True
+		bfc_rec(
+			instance, depth+1, price+instance['prices'][depth], weight+instance['weights'][depth], items, rest_items
+		)
+		items[depth] = False
+		bfc_rec(instance, depth+1, price, weight, items, rest_items)
+
+def brute_force_cut(instance, ins_id):
+	tmp_instance = instance.copy()
+	heur_ppw(tmp_instance, ins_id)
+	instance['bfc_sol'] = {
+		'price': tmp_instance['hppw_sol']['price'],
+		'weight': tmp_instance['hppw_sol']['weight'],
+		'items': tmp_instance['hppw_sol']['items']
+	}
+	items = [False for i in range(instance['size'])]
+	rest_items = instance['prices'][:]
+	for i in range(instance['size']-1, 0, -1):
+		rest_items[i-1]+=rest_items[i]
+	bfc_rec(instance=instance, depth=0, price=0, weight=0, items=items, rest_items=rest_items)
+	if instance['bfc_sol']['price'] != instance['opt_sol']['price']:
+		print('FAAAAAAAIL opt: {}, bfc: {}'.format(instance['opt_sol']['price'], instance['bfc_sol']['price']))
 
 def bf_rec(instance, depth, price, weight, items):
 	if price > instance['bf_sol']['price'] and weight <= instance['capacity']:
@@ -68,14 +102,10 @@ def brute_force(instance, ins_id):
 	}
 	items = [False for i in range(instance['size'])]
 	bf_rec(instance=instance, depth=0, price=0, weight=0, items=items)
-	#~ if instance['bf_sol']['price'] != instance['opt_sol']['price'] or instance['bf_sol']['items'] != instance['opt_sol']['items']:
-	#~ if instance['bf_sol']['price'] != instance['opt_sol']['price']:
-		#~ print('{} failed \n\toptimal:    {}\n\tbrute force:{}'.format(ins_id, instance['opt_sol'], instance['bf_sol']))
 
 def heur_ppw(instance, ins_id):
 	data = [(i, instance['prices'][i]/instance['weights'][i]) for i in range(instance['size'])]
 	data.sort(key=lambda item: item[1], reverse=True)
-	pprint(data)
 	items = [False for i in range(instance['size'])]
 	weight = 0
 	price = 0
@@ -142,7 +172,7 @@ def heur_weight(instance, ins_id):
 @click.option('--time-measure', '-t', default=True, type=click.BOOL, help='display time per insance')
 @click.option(
 	'--algorithm', '-a', prompt='Select algorithm', 
-	type=click.Choice(['hw', 'hp', 'hppw', 'bf']), help='algorithm type'
+	type=click.Choice(['hw', 'hp', 'hppw', 'bf', 'bfc']), help='algorithm type'
 )
 def main(instances_file, solutions_file, time_measure, repeats, algorithm):
 	instances = load_instances(instances_file, solutions_file)
@@ -153,6 +183,8 @@ def main(instances_file, solutions_file, time_measure, repeats, algorithm):
 		for i in range(repeats):
 			if algorithm == 'bf':
 				brute_force(instance, key)
+			elif algorithm == 'bfc':
+				brute_force_cut(instance, key)
 			elif algorithm == 'hw':
 				heur_weight(instance, key)
 			elif algorithm == 'hp':
