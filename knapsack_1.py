@@ -126,26 +126,42 @@ def heur_weight(instance, ins_id):
 
 @click.command()
 @click.option(
-	'--instances-file',
+	'--instances-file', '-i',
 	type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True),
 	help='path to file with instances', prompt='Enter path to file with instances'
 )
 @click.option(
-	'--solutions-file',
+	'--solutions-file', '-s',
 	type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True),
 	help='path to file with solutions', prompt='Enter path to file with solutions'
 )
-def main(instances_file, solutions_file):
+@click.option(
+	'--repeats', '-r', default=1, type=click.IntRange(1, 1000),
+	help='number of retition of each instance'
+)
+@click.option('--time-measure', '-t', default=True, type=click.BOOL, help='display time per insance')
+@click.option(
+	'--algorithm', '-a', prompt='Select algorithm', 
+	type=click.Choice(['hw', 'hp', 'hppw', 'bf']), help='algorithm type'
+)
+def main(instances_file, solutions_file, time_measure, repeats, algorithm):
 	instances = load_instances(instances_file, solutions_file)
 	index = 1
 	for key, instance in instances.items():
-		#~ start = time.time()
-		brute_force(instance, key)
-		heur_weight(instance, key)
-		heur_price(instance, key)
-		heur_ppw(instance, key)
-		pprint(instance)
-		#~ print('{} of {}, time {:0.3f}s'.format(index, len(instances), time.time() - start))
+		if time_measure:
+			start = time.time() 
+		for i in range(repeats):
+			if algorithm == 'bf':
+				brute_force(instance, key)
+			elif algorithm == 'hw':
+				heur_weight(instance, key)
+			elif algorithm == 'hp':
+				heur_price(instance, key)
+			elif algorithm == 'hppw':
+				heur_ppw(instance, key)
+		#~ pprint(instance)
+		if time:
+			print('time: {:0.3f}s'.format((time.time() - start)/repeats))
 		index += 1
 	#~ pprint(instances)
 	return 0
