@@ -8,27 +8,29 @@ import time
 
 def load_instances(instances_file, solutions_file):
 	instances = {}
-	ins = open(instances_file, 'r')
-	for line in ins:
-		data = line.split(' ')
-		ins_size = int(data[1])
-		instances[int(data[0])] = {
-			'size': ins_size,
-			'capacity': int(data[2]),
-			'weights': list(map(int, data[3::2])),
-			'prices': list(map(int, data[4::2])),
-		}
-	ins.close()
+	#~ ins = open(instances_file, 'r')
+	with open(instances_file, 'r') as ins:
+		for line in ins:
+			data = line.split(' ')
+			ins_size = int(data[1])
+			instances[int(data[0])] = {
+				'size': ins_size,
+				'capacity': int(data[2]),
+				'weights': list(map(int, data[3::2])),
+				'prices': list(map(int, data[4::2])),
+			}
+	#~ ins.close()
 
-	sol = open(solutions_file, 'r')
-	for line in sol:
-		data = line.split(' ')
-		ins_id = int(data[0])
-		instances[ins_id]['opt_sol'] = {
-			'price': int(data[2]),
-			'items': list(map(bool, map(int, data[4:]))),
-		}
-	sol.close()
+	#~ sol = open(solutions_file, 'r')
+	with open(solutions_file, 'r') as sol:
+		for line in sol:
+			data = line.split(' ')
+			ins_id = int(data[0])
+			instances[ins_id]['opt_sol'] = {
+				'price': int(data[2]),
+				'items': list(map(bool, map(int, data[4:]))),
+			}
+	#~ sol.close()
 	return instances
 
 def bf_rec2(instance, depth, price, weight, items):
@@ -82,7 +84,7 @@ def brute_force_cut(instance, ins_id):
 	if instance['bfc_sol']['price'] != instance['opt_sol']['price']:
 		print('FAAAAAAAIL opt: {}, bfc: {}'.format(instance['opt_sol']['price'], instance['bfc_sol']['price']))
 
-def bf_rec(instance, depth, price, weight, items):
+def bf_rec1(instance, depth, price, weight, items):
 	if price > instance['bf_sol']['price'] and weight <= instance['capacity']:
 		instance['bf_sol']['price'] = price
 		instance['bf_sol']['weight'] = weight
@@ -93,6 +95,17 @@ def bf_rec(instance, depth, price, weight, items):
 		bf_rec(instance, depth+1, price+instance['prices'][depth], weight+instance['weights'][depth], items)
 		items[depth] = False
 		bf_rec(instance, depth+1, price, weight, items)
+
+def bf_rec(instance, depth, price, weight, items):
+	if depth < instance['size']:
+		items[depth] = True
+		bf_rec(instance, depth+1, price+instance['prices'][depth], weight+instance['weights'][depth], items)
+		items[depth] = False
+		bf_rec(instance, depth+1, price, weight, items)
+	elif price > instance['bf_sol']['price'] and weight <= instance['capacity']:
+		instance['bf_sol']['price'] = price
+		instance['bf_sol']['weight'] = weight
+		instance['bf_sol']['items'] = items[:]
 
 def brute_force(instance, ins_id):
 	instance['bf_sol'] = {
@@ -154,6 +167,17 @@ def heur_weight(instance, ins_id):
 		'items': items
 	}
 
+def print_sol(sol, id_sol, opt_price, time=None):
+	print(
+		'{};{};{};{};{:.04f};'.format(id_sol, len(sol['items']), sol['price'], sol['weight'], sol['price']/opt_price),
+		end=''
+	)
+	if time:
+		print('{:.04f};'.format(time),end='')
+	for item in sol['items']:
+		print('{};'.format(item),end='')
+	print()
+
 @click.command()
 @click.option(
 	'--instances-file', '-i',
@@ -177,6 +201,19 @@ def heur_weight(instance, ins_id):
 def main(instances_file, solutions_file, time_measure, repeats, algorithm):
 	instances = load_instances(instances_file, solutions_file)
 	index = 1
+
+	sol_to_print = 'opt_sol'
+	if algorithm == 'bf':
+		sol_to_print = 'bf_sol'
+	elif algorithm == 'bfc':
+		sol_to_print = 'bfc_sol'
+	elif algorithm == 'hw':
+		sol_to_print = 'hwei_sol'
+	elif algorithm == 'hp':
+		sol_to_print = 'hpri_sol'
+	elif algorithm == 'hppw':
+		sol_to_print = 'hppw_sol'
+
 	for key, instance in instances.items():
 		if time_measure:
 			start = time.time() 
@@ -191,9 +228,12 @@ def main(instances_file, solutions_file, time_measure, repeats, algorithm):
 				heur_price(instance, key)
 			elif algorithm == 'hppw':
 				heur_ppw(instance, key)
-		#~ pprint(instance)
+
 		if time:
-			print('time: {:0.3f}s'.format((time.time() - start)/repeats))
+			#~ print('time: {:0.3f}s'.format((time.time() - start)/repeats), end='')
+			print_sol(instance[sol_to_print], key, instance['opt_sol']['price'], (time.time() - start)/repeats)
+		else:
+			print_sol(instance[sol_to_print], key, instance['opt_sol']['price'])
 		index += 1
 	#~ pprint(instances)
 	return 0
