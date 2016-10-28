@@ -167,7 +167,7 @@ def heur_weight(instance, ins_id):
 		'items': items
 	}
 
-def dynamic_weight(instance, ins_id):
+def dynamic_weight(instance, ins_id, check=True):
 	line1 = [{'price': 0, 'path': 0, 'weight': 0} for i in range(instance['capacity']+1)]
 	line2 = [{'price': 0, 'path': 0, 'weight': 0} for i in range(instance['capacity']+1)]
 	for i in range(instance['size']):
@@ -203,13 +203,13 @@ def dynamic_weight(instance, ins_id):
 			instance['dw_sol']['items'][i] = True
 			instance['dw_sol']['weight'] += instance['weights'][i]
 			tmp_price += instance['prices'][i]
-	if instance['opt_sol']['price'] != instance['dw_sol']['price'] or instance['dw_sol']['price'] != tmp_price:
+	if check and instance['opt_sol']['price'] != instance['dw_sol']['price'] or instance['dw_sol']['price'] != tmp_price:
 		print('opt_pri={}, pri={}, check_pri={}'.format(instance['opt_sol']['price'], instance['dw_sol']['price'], tmp_price))
 		pprint(instance)
 		exit(1)
 
 
-def dynamic_price(instance, ins_id):
+def dynamic_price(instance, ins_id, check=True):
 	total_price = 0
 	for item in instance['prices']:
 		total_price += item
@@ -260,11 +260,32 @@ def dynamic_price(instance, ins_id):
 			path -= q
 			instance['dp_sol']['items'][i] = True
 			tmp_price += instance['prices'][i]
-	if instance['opt_sol']['price'] != instance['dp_sol']['price'] or instance['dp_sol']['price'] != tmp_price:
+	if check and instance['opt_sol']['price'] != instance['dp_sol']['price'] or instance['dp_sol']['price'] != tmp_price:
 		print('opt_pri={}, pri={}, check_pri={}'.format(instance['opt_sol']['price'], instance['dp_sol']['price'], tmp_price))
 		pprint(instance)
 		exit(1)
 
+
+def fptas(instance, ins_id, epsilon):
+	if epsilon > 1 or epsilon <= 0:
+		print("Epsilon aout of range (0, 1]")
+		exit(1)
+	tmp_instance = instance.copy()
+	k = epsilon * max(tmp_instance['prices']) / tmp_instance['size']
+	tmp_instance['prices'] = []
+	for price in instance['prices']:
+		tmp_instance['prices'].append(int(price//k))
+	dynamic_price(tmp_instance, ins_id, False)
+	#~ pprint(tmp_instance)
+	instance['fptas_sol'] = {
+		'price': 0,
+		'weight': tmp_instance['dp_sol']['weight'],
+		'items': tmp_instance['dp_sol']['items']
+	}
+	for i in range(instance['size']):
+		if instance['fptas_sol']['items'][i]:
+			instance['fptas_sol']['price'] += instance['prices'][i]
+	#~ pprint(instance)
 
 def print_sol(sol, id_sol, opt_price, time=None):
 	print(
@@ -292,12 +313,16 @@ def print_sol(sol, id_sol, opt_price, time=None):
 	'--repeats', '-r', default=1, type=click.IntRange(1, 1000),
 	help='number of retition of each instance'
 )
+@click.option(
+	'--epsilon', '-e', default=1, type=click.FLOAT,
+	help='epsilon valu for fptas'
+)
 @click.option('--time-measure', '-t', default=True, type=click.BOOL, help='display time per insance')
 @click.option(
 	'--algorithm', '-a', prompt='Select algorithm', 
-	type=click.Choice(['hw', 'hp', 'hppw', 'bf', 'bfc', 'dw', 'dp']), help='algorithm type'
+	type=click.Choice(['hw', 'hp', 'hppw', 'bf', 'bfc', 'dw', 'dp', 'fptas']), help='algorithm type'
 )
-def main(instances_file, solutions_file, time_measure, repeats, algorithm):
+def main(instances_file, solutions_file, time_measure, repeats, algorithm, epsilon):
 	instances = load_instances(instances_file, solutions_file)
 	index = 1
 
@@ -316,6 +341,8 @@ def main(instances_file, solutions_file, time_measure, repeats, algorithm):
 		sol_to_print = 'dw_sol'
 	elif algorithm == 'dp':
 		sol_to_print = 'dp_sol'
+	elif algorithm == 'fptas':
+		sol_to_print = 'fptas_sol'
 
 	for key, instance in instances.items():
 		if time_measure:
@@ -335,6 +362,8 @@ def main(instances_file, solutions_file, time_measure, repeats, algorithm):
 				dynamic_weight(instance, key)
 			elif algorithm == 'dp':
 				dynamic_price(instance, key)
+			elif algorithm == 'fptas':
+				fptas(instance, key, epsilon)
 
 		if time:
 			#~ print('time: {:0.3f}s'.format((time.time() - start)/repeats), end='')
