@@ -167,6 +167,105 @@ def heur_weight(instance, ins_id):
 		'items': items
 	}
 
+def dynamic_weight(instance, ins_id):
+	line1 = [{'price': 0, 'path': 0, 'weight': 0} for i in range(instance['capacity']+1)]
+	line2 = [{'price': 0, 'path': 0, 'weight': 0} for i in range(instance['capacity']+1)]
+	for i in range(instance['size']):
+		q = 2**i
+		weight = instance['weights'][i]
+		price = instance['prices'][i]
+		tmp_path = None
+		tmp_old_price = None
+		for j in range(instance['capacity']+1):
+			if j >= weight and line1[j-weight]['price'] + price > line1[j]['price']:
+				if tmp_old_price != line1[j-weight]['price']: 
+					tmp_path = line1[j-weight]['path'] + q
+					tmp_old_price = line1[j-weight]['price']
+				line2[j]['price'] = line1[j-weight]['price'] + price
+				line2[j]['path'] = tmp_path
+			else:
+				line2[j]['price'], line2[j]['path'] = line1[j]['price'], line1[j]['path']
+		line_tmp = line1
+		line1, line2 = line2, line_tmp
+
+	instance['dw_sol'] = {
+		'price': line1[instance['capacity']]['price'],
+		'weight': 0,
+		'items': [False for i in range(instance['size'])]
+	}
+
+	path = line1[instance['capacity']]['path']
+	tmp_price = 0
+	for i in range(instance['size'])[::-1]:
+		q = 2**i
+		if q <= path:
+			path -= q
+			instance['dw_sol']['items'][i] = True
+			instance['dw_sol']['weight'] += instance['weights'][i]
+			tmp_price += instance['prices'][i]
+	if instance['opt_sol']['price'] != instance['dw_sol']['price'] or instance['dw_sol']['price'] != tmp_price:
+		print('opt_pri={}, pri={}, check_pri={}'.format(instance['opt_sol']['price'], instance['dw_sol']['price'], tmp_price))
+		pprint(instance)
+		exit(1)
+
+
+def dynamic_price(instance, ins_id):
+	total_price = 0
+	for item in instance['prices']:
+		total_price += item
+	line1 = [None for i in range(total_price+1)]
+	line2 = [None for i in range(total_price+1)]
+	if instance['size'] > 0:
+		line1[0] = {'price': 0, 'path': 0, 'weight': 0}
+	for i in range(instance['size']):
+		q = 2**i
+		weight = instance['weights'][i]
+		price = instance['prices'][i]
+		for j in range(total_price+1):
+			if j >= price and line1[j-price]:
+				if not line2[j]:
+					line2[j] = {'price': 0, 'path': 0, 'weight': 0}
+				if line1[j-price]: 
+					line2[j]['weight'] = line1[j-price]['weight'] + weight
+					line2[j]['path'] = line1[j-price]['path'] + q
+					line2[j]['price'] = line1[j-price]['price'] + price
+					if line1[j] and line1[j]['weight'] < line2[j]['weight']:
+						line2[j]['weight'], line2[j]['path'] = line1[j]['weight'], line1[j]['path']
+						line2[j]['price'] = line1[j]['price']
+			elif line1[j]:
+				if not line2[j]:
+					line2[j] = {'price': 0, 'path': 0, 'weight': 0}
+				line2[j]['weight'], line2[j]['path'] = line1[j]['weight'], line1[j]['path']
+				line2[j]['price'] = line1[j]['price']
+		line_tmp = line1
+		line1, line2 = line2, line_tmp
+
+	instance['dp_sol'] = {
+		'price': 0,
+		'weight': 0,
+		'items': [False for i in range(instance['size'])]
+	}
+
+	path = 0
+	for i in range(total_price+1):
+		if line1[i] and line1[i]['weight'] <= instance['capacity']:
+			path = line1[i]['path']
+			instance['dp_sol']['price'] = i
+			instance['dp_sol']['weight'] = line1[i]['weight']
+
+	tmp_price = 0
+	for i in range(instance['size'])[::-1]:
+		q = 2**i
+		if q <= path:
+			path -= q
+			instance['dp_sol']['items'][i] = True
+			tmp_price += instance['prices'][i]
+	if instance['opt_sol']['price'] != instance['dp_sol']['price'] or instance['dp_sol']['price'] != tmp_price:
+		print('opt_pri={}, pri={}, check_pri={}'.format(instance['opt_sol']['price'], instance['dp_sol']['price'], tmp_price))
+		pprint(instance)
+		exit(1)
+
+
 def print_sol(sol, id_sol, opt_price, time=None):
 	print(
 		'{};{};{};{};{:.04f};'.format(id_sol, len(sol['items']), sol['price'], sol['weight'], sol['price']/opt_price),
@@ -196,7 +295,7 @@ def print_sol(sol, id_sol, opt_price, time=None):
 @click.option('--time-measure', '-t', default=True, type=click.BOOL, help='display time per insance')
 @click.option(
 	'--algorithm', '-a', prompt='Select algorithm', 
-	type=click.Choice(['hw', 'hp', 'hppw', 'bf', 'bfc']), help='algorithm type'
+	type=click.Choice(['hw', 'hp', 'hppw', 'bf', 'bfc', 'dw', 'dp']), help='algorithm type'
 )
 def main(instances_file, solutions_file, time_measure, repeats, algorithm):
 	instances = load_instances(instances_file, solutions_file)
@@ -213,6 +312,10 @@ def main(instances_file, solutions_file, time_measure, repeats, algorithm):
 		sol_to_print = 'hpri_sol'
 	elif algorithm == 'hppw':
 		sol_to_print = 'hppw_sol'
+	elif algorithm == 'dw':
+		sol_to_print = 'dw_sol'
+	elif algorithm == 'dp':
+		sol_to_print = 'dp_sol'
 
 	for key, instance in instances.items():
 		if time_measure:
@@ -228,6 +331,10 @@ def main(instances_file, solutions_file, time_measure, repeats, algorithm):
 				heur_price(instance, key)
 			elif algorithm == 'hppw':
 				heur_ppw(instance, key)
+			elif algorithm == 'dw':
+				dynamic_weight(instance, key)
+			elif algorithm == 'dp':
+				dynamic_price(instance, key)
 
 		if time:
 			#~ print('time: {:0.3f}s'.format((time.time() - start)/repeats), end='')
@@ -235,6 +342,8 @@ def main(instances_file, solutions_file, time_measure, repeats, algorithm):
 		else:
 			print_sol(instance[sol_to_print], key, instance['opt_sol']['price'])
 		index += 1
+		#~ if index > 4:
+			#~ exit(0)
 	#~ pprint(instances)
 	return 0
 
