@@ -287,13 +287,21 @@ def fptas(instance, ins_id, epsilon):
 			instance['fptas_sol']['price'] += instance['prices'][i]
 	#~ pprint(instance)
 
-def print_sol(sol, id_sol, opt_price, time=None):
+def print_sol(instance, sol_to_print, id_sol, time=None):
+	sol = instance[sol_to_print]
+	opt_price = instance['opt_sol']['price']
+	
 	print(
 		'{};{};{};{};{:.04f};'.format(id_sol, len(sol['items']), sol['price'], sol['weight'], sol['price']/opt_price),
 		end=''
 	)
 	if time:
 		print('{:.04f};'.format(time),end='')
+	#~ if instace_info:
+	tot_price = sum(instance['prices'])
+	max_price = max(instance['prices'])
+	tot_weight = sum(instance['weights'])
+	print('{};{};{};{};'.format(instance['capacity'],tot_weight,tot_price,max_price),end='')
 	for item in sol['items']:
 		print('{};'.format(item),end='')
 	print()
@@ -367,12 +375,12 @@ def main(instances_file, solutions_file, time_measure, repeats, algorithm, epsil
 
 		if time:
 			#~ print('time: {:0.3f}s'.format((time.time() - start)/repeats), end='')
-			print_sol(instance[sol_to_print], key, instance['opt_sol']['price'], (time.time() - start)/repeats)
+			print_sol(instance, sol_to_print, key, (time.time() - start)/repeats)
 		else:
-			print_sol(instance[sol_to_print], key, instance['opt_sol']['price'])
+			print_sol(instance, sol_to_print, key)
 		index += 1
-		#~ if index > 4:
-			#~ exit(0)
+		if index > 50:
+			exit(0)
 	#~ pprint(instances)
 	return 0
 
